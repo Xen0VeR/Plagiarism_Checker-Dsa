@@ -1,23 +1,41 @@
+#pragma once
+#include "../tokenizer.hpp"
 #include "structures.hpp"
-// -----------------------------------------------------------------------------
+#include <chrono>
+#include <thread>
+#include <mutex>
+#include <shared_mutex>
+#include <queue>
+#include <memory>
+#include <vector>
 
-// You are free to add any STL includes above this comment, below the --line--.
-// DO NOT add "using namespace std;" or include any other files/libraries.
-// Also DO NOT add the include "bits/stdc++.h"
-
-// OPTIONAL: Add your helper functions and classes here
+struct SubmissionInfo {
+    std::shared_ptr<submission_t> submission;
+    std::chrono::system_clock::time_point timestamp;
+    std::vector<int> tokens;
+};
 
 class plagiarism_checker_t {
-    // You should NOT modify the public interface of this class.
 public:
     plagiarism_checker_t(void);
-    plagiarism_checker_t(std::vector<std::shared_ptr<submission_t>> 
-                            __submissions);
+    plagiarism_checker_t(std::vector<std::shared_ptr<submission_t>> __submissions);
     ~plagiarism_checker_t(void);
     void add_submission(std::shared_ptr<submission_t> __submission);
 
 protected:
-    // TODO: Add members and function signatures here
+    mutable std::shared_mutex submissions_mutex;  // For all_submissions
+    std::mutex queue_mutex;                       // For submission_queue
+    static std::mutex file_mutex;                 // Global mutex for file operations
+    std::thread worker;
+    std::atomic<bool> running;
+    std::queue<SubmissionInfo> submission_queue;
+    std::vector<SubmissionInfo> all_submissions;
     
-    // End TODO
+    void worker_thread();
+    bool check_single_plagiarism(const std::vector<int>& tokens1, 
+                               const std::vector<int>& tokens2,
+                               int& match_count);
+    void process_submission(SubmissionInfo& new_submission);
+    bool check_patchwork_plagiarism(const SubmissionInfo& submission);
+    std::vector<int> get_submission_tokens(const std::string& filename);
 };
